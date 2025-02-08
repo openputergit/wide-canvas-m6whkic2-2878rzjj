@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KOP Passport Generator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        .passport-preview {
+            width: 3.5in;
+            height: 5in;
+            background: #f0f9ff;
+            border: 2px solid #1e40af;
+            position: relative;
+        }
+        @media print {
+            .no-print {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body class="bg-blue-50 min-h-screen p-4">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold text-blue-900 mb-6 text-center">KOP Passport Generator</h1>
+        
+        <div class="bg-white p-6 rounded-lg shadow-lg mb-6">
+            <div class="mb-4">
+                <label class="block text-gray-700 mb-2">Number of Passports:</label>
+                <input type="number" id="passportCount" min="1" value="1" class="border rounded p-2 w-full">
+            </div>
+            
+            <div id="passportForms"></div>
+            
+            <button onclick="generatePDF()" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 mt-4">
+                Generate Passports PDF
+            </button>
+        </div>
+
+        <div id="previewArea" class="hidden"></div>
+    </div>
+
+    <script>
+        let currentPassports = 1;
+
+        function createPassportForm(index) {
+            const uniqueId = `passport-${index}`;
+            return `
+                <div class="border-t pt-4 mt-4" id="${uniqueId}">
+                    <h3 class="text-xl font-semibold mb-4">Passport ${index + 1}</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-gray-700 mb-2">Full Name:</label>
+                            <input type="text" class="name-input border rounded p-2 w-full">
+                        </div>
+                        <div>
+                            <label class="block text-gray-700 mb-2">Date of Birth:</label>
+                            <input type="date" class="dob-input border rounded p-2 w-full">
+                        </div>
+                        <div>
+                            <label class="block text-gray-700 mb-2">Place of Birth:</label>
+                            <input type="text" class="pob-input border rounded p-2 w-full">
+                        </div>
+                        <div>
+                            <label class="block text-gray-700 mb-2">Nationality:</label>
+                            <input type="text" value="KOP" class="nationality-input border rounded p-2 w-full" readonly>
+                        </div>
+                        <div>
+                            <label class="block text-gray-700 mb-2">Gender:</label>
+                            <select class="gender-input border rounded p-2 w-full">
+                                <option value="M">Male</option>
+                                <option value="F">Female</option>
+                                <option value="O">Other</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-gray-700 mb-2">KOP ID:</label>
+                            <input type="text" class="kop-id-input border rounded p-2 w-full" 
+                                value="KOP${Math.random().toString(36).substr(2, 8).toUpperCase()}" readonly>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        document.getElementById('passportCount').addEventListener('change', function(e) {
+            const count = parseInt(e.target.value) || 1;
+            const formsContainer = document.getElementById('passportForms');
+            formsContainer.innerHTML = '';
+            
+            for(let i = 0; i < count; i++) {
+                formsContainer.innerHTML += createPassportForm(i);
+            }
+            currentPassports = count;
+        });
+
+        // Initialize first form
+        document.getElementById('passportForms').innerHTML = createPassportForm(0);
+
+        function generatePassportHTML(data) {
+            return `
+                <div class="passport-preview p-6">
+                    <div class="text-center mb-4">
+                        <h2 class="text-2xl font-bold text-blue-900">Kingdom of Playland</h2>
+                        <h3 class="text-xl font-semibold text-blue-800">Official Passport</h3>
+                    </div>
+                    <div class="space-y-2">
+                        <p><strong>Full Name:</strong> ${data.name}</p>
+                        <p><strong>Date of Birth:</strong> ${data.dob}</p>
+                        <p><strong>Place of Birth:</strong> ${data.pob}</p>
+                        <p><strong>Nationality:</strong> ${data.nationality}</p>
+                        <p><strong>Gender:</strong> ${data.gender}</p>
+                        <p><strong>KOP ID:</strong> ${data.kopId}</p>
+                    </div>
+                    <div class="absolute bottom-4 right-4">
+                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${data.kopId}" 
+                            alt="QR Code" width="100" height="100">
+                    </div>
+                </div>
+            `;
+        }
+
+        async function generatePDF() {
+            const previewArea = document.getElementById('previewArea');
+            previewArea.innerHTML = '';
+
+            const passports = [];
+            const forms = document.querySelectorAll('[id^="passport-"]');
+            
+            forms.forEach(form => {
+                const passportData = {
+                    name: form.querySelector('.name-input').value,
+                    dob: form.querySelector('.dob-input').value,
+                    pob: form.querySelector('.pob-input').value,
+                    nationality: form.querySelector('.nationality-input').value,
+                    gender: form.querySelector('.gender-input').value,
+                    kopId: form.querySelector('.kop-id-input').value
+                };
+                passports.push(passportData);
+            });
+
+            // Create preview elements
+            passports.forEach(passport => {
+                const passportElement = document.createElement('div');
+                passportElement.innerHTML = generatePassportHTML(passport);
+                previewArea.appendChild(passportElement);
+            });
+
+            // Initialize jsPDF
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'in', [8.5, 11]);
+
+            // Convert each passport to PDF
+            for(let i = 0; i < passports.length; i++) {
+                const element = previewArea.children[i];
+                const canvas = await html2canvas(element);
+                const imgData = canvas.toDataURL('image/png');
+                
+                if(i > 0) doc.addPage();
+                doc.addImage(imgData, 'PNG', 1, 1, 6.5, 9);
+            }
+
+            // Save the PDF
+            doc.save('KOP_Passports.pdf');
+        }
+    </script>
+<script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+</html>
